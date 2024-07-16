@@ -331,8 +331,16 @@ codedump(mrb_state *mrb, const mrb_irep *irep, FILE *out)
       fprintf(out, "SSENDB\tR%d\t:%s\t", a, mrb_sym_dump(mrb, irep->syms[b]));
       print_args(c, out);
       break;
+    CASE(OP_SEND_KEEP_RCV, BBB):
+      fprintf(out, "SEND_KEEP_RCV\t\tR%d\t:%s\t", a, mrb_sym_dump(mrb, irep->syms[b]));
+      print_args(c, out);
+      break;
     CASE(OP_SEND, BBB):
       fprintf(out, "SEND\t\tR%d\t:%s\t", a, mrb_sym_dump(mrb, irep->syms[b]));
+      print_args(c, out);
+      break;
+    CASE(OP_SENDB_KEEP_RCV, BBB):
+      fprintf(out, "SENDB_KEEP_RCV\t\tR%d\t:%s\t", a, mrb_sym_dump(mrb, irep->syms[b]));
       print_args(c, out);
       break;
     CASE(OP_SENDB, BBB):

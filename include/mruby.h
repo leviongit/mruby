@@ -172,10 +172,13 @@ typedef void* (*mrb_allocf) (struct mrb_state *mrb, void *ptr, size_t size, void
 #define MRB_FIXED_STATE_ATEXIT_STACK_SIZE 5
 #endif
 
+#define MRB_CI_NOOP_RET_FLG 1
+
 typedef struct {
   uint8_t n:4;                  /* (15=*) c=n|nk<<4 */
   uint8_t nk:4;                 /* (15=*) */
   uint8_t cci;                  /* called from C function */
+  uint8_t flags;
   mrb_sym mid;
   const struct RProc *proc;
   struct RProc *blk;

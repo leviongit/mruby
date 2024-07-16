@@ -16,6 +16,7 @@
 #include <mruby/variable.h>
 #include <mruby/error.h>
 #include <mruby/opcode.h>
+#include "mruby/boxing_word.h"
 #include "value_array.h"
 #include <mruby/throw.h>
 #include <mruby/dump.h>
@@ -333,7 +334,7 @@ mrb_vm_ci_env_clear(mrb_state *mrb, mrb_callinfo *ci)
 
 static inline mrb_callinfo*
 cipush(mrb_state *mrb, mrb_int push_stacks, uint8_t cci, struct RClass *target_class,
-       const struct RProc *proc, struct RProc *blk, mrb_sym mid, uint16_t argc)
+       const struct RProc *proc, struct RProc *blk, mrb_sym mid, uint16_t argc, uint8_t flags)
 {
   struct mrb_context *c = mrb->c;
   mrb_callinfo *ci = c->ci;
@@ -355,6 +356,7 @@ cipush(mrb_state *mrb, mrb_int push_stacks, uint8_t cci, struct RClass *target_c
   ci->stack = ci[-1].stack + push_stacks;
   ci->n = argc & 0xf;
   ci->nk = (argc>>4) & 0xf;
+  ci->flags = flags;
   ci->cci = cci;
   ci->u.target_class = target_class;
 
@@ -721,7 +723,7 @@ mrb_funcall_with_block(mrb_state *mrb, mrb_value self, mrb_sym mid, mrb_int argc
       mrb_exc_raise(mrb, mrb_obj_value(mrb->stack_err));
     }
     blk = ensure_block(mrb, blk);
-    ci = cipush(mrb, n, CINFO_DIRECT, NULL, NULL, BLK_PTR(blk), 0, 0);
+    ci = cipush(mrb, n, CINFO_DIRECT, NULL, NULL, BLK_PTR(blk), 0, 0, 0);
     funcall_args_capture(mrb, 0, argc, argv, blk, ci);
     ci->u.target_class = mrb_class(mrb, self);
     m = mrb_vm_find_method(mrb, ci->u.target_class, &ci->u.target_class, mid);
@@ -803,7 +805,7 @@ exec_irep(mrb_state *mrb, mrb_value self, const struct RProc *p)
     stack_clear(ci->stack+keep, nregs-keep);
   }
 
-  cipush(mrb, 0, 0, NULL, NULL, NULL, 0, 0);
+  cipush(mrb, 0, 0, NULL, NULL, NULL, 0, 0, 0);
 
   return self;
 }
@@ -821,7 +823,7 @@ mrb_exec_irep(mrb_state *mrb, mrb_value self, struct RProc *p)
       if (MRB_PROC_NOARG_P(p) && (ci->n > 0 || ci->nk > 0)) {
         check_method_noarg(mrb, ci);
       }
-      cipush(mrb, 0, CINFO_DIRECT, CI_TARGET_CLASS(ci), p, NULL, ci->mid, ci->n|(ci->nk<<4));
+      cipush(mrb, 0, CINFO_DIRECT, CI_TARGET_CLASS(ci), p, NULL, ci->mid, ci->n|(ci->nk<<4), 0);
       ret = MRB_PROC_CFUNC(p)(mrb, self);
       cipop(mrb);
     }
@@ -973,7 +975,7 @@ eval_under(mrb_state *mrb, mrb_value self, mrb_value blk, struct RClass *c)
   mrb->c->ci->stack[0] = self;
   mrb->c->ci->stack[1] = self;
   stack_clear(mrb->c->ci->stack+2, nregs-2);
-  cipush(mrb, 0, 0, NULL, NULL, NULL, 0, 0);
+  cipush(mrb, 0, 0, NULL, NULL, NULL, 0, 0, 0);
 
   return self;
 }
@@ -1050,7 +1052,7 @@ mrb_yield_with_class(mrb_state *mrb, mrb_value b, mrb_int argc, const mrb_value 
   else {
     mid = ci->mid;
   }
-  ci = cipush(mrb, n, CINFO_DIRECT, NULL, NULL, NULL, mid, 0);
+  ci = cipush(mrb, n, CINFO_DIRECT, NULL, NULL, NULL, mid, 0, 0);
   funcall_args_capture(mrb, 0, argc, argv, mrb_nil_value(), ci);
   ci->u.target_class = c;
   ci->proc = p;
@@ -1841,6 +1843,10 @@ RETRY_TRY_BLOCK:
       regs[a] = regs[0];
     }
     goto L_SENDB;
+    CASE(OP_SEND_KEEP_RCV, BBB)
+
+    SET_NIL_VALUE(regs[a+2]);
+    goto L_SENDB;
 
     CASE(OP_SEND, BBB)
     goto L_SENDB;
@@ -1850,6 +1856,9 @@ RETRY_TRY_BLOCK:
     /* push nil after arguments */
     SET_NIL_VALUE(regs[a+2]);
     goto L_SENDB_SYM;
+
+    CASE(OP_SENDB_KEEP_RCV, BBB)
+    goto L_SENDB;
 
     CASE(OP_SENDB, BBB)
     L_SENDB:
@@ -1887,7 +1896,7 @@ RETRY_TRY_BLOCK:
         regs[new_bidx] = blk;
       }
 
-      ci = cipush(mrb, a, CINFO_DIRECT, NULL, NULL, BLK_PTR(blk), 0, c);
+      ci = cipush(mrb, a, CINFO_DIRECT, NULL, NULL, BLK_PTR(blk), 0, c, (insn == OP_SEND_KEEP_RCV || insn == OP_SENDB_KEEP_RCV) ? 1 : 0);
       recv = regs[0];
       ci->u.target_class = (insn == OP_SUPER) ? CI_TARGET_CLASS(ci - 1)->super : mrb_class(mrb, recv);
       m = mrb_vm_find_method(mrb, ci->u.target_class, &ci->u.target_class, mid);
@@ -1949,7 +1958,7 @@ RETRY_TRY_BLOCK:
         }
       }
       mrb_assert(ci > mrb->c->cibase);
-      ci->stack[0] = recv;
+      if (!(ci->flags & 1)) ci->stack[0] = recv;
       /* pop stackpos */
       ci = cipop(mrb);
       pc = ci->pc;
@@ -2361,7 +2370,10 @@ RETRY_TRY_BLOCK:
 
       NORMAL_RETURN:
         ci = mrb->c->ci;
-        v = regs[a];
+        if (ci->flags & 1)
+          v = regs[0];
+        else
+          v = regs[a];
         mrb_gc_protect(mrb, v);
         CHECKPOINT_RESTORE(RBREAK_TAG_BREAK) {
           if (TRUE) {
@@ -2438,6 +2450,7 @@ RETRY_TRY_BLOCK:
         syms = irep->syms;
 
         ci[1].stack[0] = v;
+
         mrb_gc_arena_restore(mrb, ai);
       }
       JUMP;
@@ -2976,7 +2989,7 @@ RETRY_TRY_BLOCK:
       p->flags |= MRB_PROC_SCOPE;
 
       /* prepare call stack */
-      cipush(mrb, a, 0, mrb_class_ptr(recv), p, NULL, 0, 0);
+      cipush(mrb, a, 0, mrb_class_ptr(recv), p, NULL, 0, 0, 0);
 
       irep = p->body.irep;
       pool = irep->pool;
@@ -3129,7 +3142,7 @@ MRB_API mrb_value
 mrb_top_run(mrb_state *mrb, const struct RProc *proc, mrb_value self, mrb_int stack_keep)
 {
   if (mrb->c->cibase && mrb->c->ci > mrb->c->cibase) {
-    cipush(mrb, 0, CINFO_SKIP, mrb->object_class, NULL, NULL, 0, 0);
+    cipush(mrb, 0, CINFO_SKIP, mrb->object_class, NULL, NULL, 0, 0, 0);
   }
   return mrb_vm_run(mrb, proc, self, stack_keep);
 }
