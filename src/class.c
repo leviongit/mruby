@@ -2899,12 +2899,28 @@ static const mrb_code new_iseq[] = {
   OP_RETURN, 0               // OP_RETURN    R0
 };
 
+static const mrb_code new_kwless_iseq[] = {
+  OP_ENTER, 0x0, 0x10, 0x1,
+  OP_SSEND, 3, 0, 0,
+  OP_MOVE, 0, 3,
+  OP_MOVE, 3, 2,
+  OP_MOVE, 2, 1,
+  OP_SSENDB, 1, 1, 0x0f,
+  OP_RETURN, 0
+};
+
 MRB_PRESYM_DEFINE_VAR_AND_INITER(new_syms, 2, MRB_SYM(allocate), MRB_SYM(initialize))
 
 static const mrb_irep new_irep = {
+    4,    6,    0,    MRB_IREP_STATIC,  new_iseq, NULL, new_syms,
+    NULL, NULL, NULL, sizeof(new_iseq), 0,        2,    0,
+    0,
+};
+
+static const mrb_irep new_kwless_irep = {
   4, 6, 0, MRB_IREP_STATIC,
-  new_iseq, NULL, new_syms, NULL, NULL, NULL,
-  sizeof(new_iseq), 0, 2, 0, 0,
+  new_kwless_iseq, NULL, new_syms, NULL, NULL, NULL,
+  sizeof(new_kwless_iseq), 0, 2, 0, 0,
 };
 
 static const struct RProc new_proc = {
@@ -2912,14 +2928,23 @@ static const struct RProc new_proc = {
   { &new_irep }, NULL, { NULL }
 };
 
+static const struct RProc new_kwless_proc = {
+  NULL, NULL, MRB_TT_PROC, MRB_GC_RED, MRB_FL_OBJ_IS_FROZEN | MRB_PROC_SCOPE | MRB_PROC_STRICT,
+  { &new_kwless_irep }, NULL, { NULL }
+};
+
 static void
 init_class_new(mrb_state *mrb, struct RClass *cls)
 {
   mrb_method_t m;
+  mrb_method_t m2;
 
   MRB_PRESYM_INIT_SYMBOLS(mrb, new_syms);
   MRB_METHOD_FROM_PROC(m, &new_proc);
+  MRB_METHOD_FROM_PROC(m2, &new_kwless_proc);
+
   mrb_define_method_raw(mrb, cls, MRB_SYM(new), m);
+  mrb_define_method_raw(mrb, cls, MRB_SYM(new_kwless), m2);
 }
 
 void
