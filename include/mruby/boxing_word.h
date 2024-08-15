@@ -217,33 +217,80 @@ mrb_integer_func(mrb_value o) {
 #define SET_OBJ_VALUE(r,v) ((r).w = (uintptr_t)(v))
 
 MRB_INLINE enum mrb_vtype
-mrb_type(mrb_value o)
-{
-  switch (o.w & 0x07) {
-  case 0x00:
-    return (o.w == 0) ? MRB_TT_FALSE : mrb_val_union(o).bp->tt;
-  case 0x02: case 0x06:
+mrb_type(mrb_value o) {
+  static const char lut[32] = {
+    MRB_TT_MAXDEFINE /* 0x00 */,
+    MRB_TT_INTEGER /* 0x01 */,
 #ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
-    return MRB_TT_SYMBOL;
+    MRB_TT_SYMBOL /* 0x02 */,
 #else
-    return MRB_TT_FLOAT;
+    MRB_TT_FLOAT  /* 0x02 */,
 #endif
-  case 0x04:
-    switch (o.w) {
-    case 0x04:
-      return MRB_TT_FALSE;
-    case 0x0c:
-      return MRB_TT_TRUE;
-    case 0x14:
-      return MRB_TT_UNDEF;
-    default:
-      /* SHALL NOT be reached if MRB_WORDBOX_NO_FLOAT_TRUNCATE is defined */
-      return MRB_TT_SYMBOL;
-    }
-  case 0x01: case 0x03: case 0x05: case 0x07:
-  default:
-    return MRB_TT_INTEGER;
+    MRB_TT_INTEGER /* 0x03 */,
+    MRB_TT_FALSE /* 0x04 */,
+    MRB_TT_INTEGER /* 0x05 */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x06 */,
+#else
+    MRB_TT_FLOAT  /* 0x06 */,
+#endif
+    MRB_TT_INTEGER /* 0x07 */,
+    MRB_TT_MAXDEFINE /* 0x08 */,
+    MRB_TT_INTEGER /* 0x09 */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x0a */,
+#else
+    MRB_TT_FLOAT  /* 0x0a */,
+#endif
+    MRB_TT_INTEGER /* 0x0b */,
+    MRB_TT_TRUE  /* 0x0c */,
+    MRB_TT_INTEGER /* 0x0d */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x0e */,
+#else
+    MRB_TT_FLOAT  /* 0x0e */,
+#endif
+    MRB_TT_INTEGER /* 0x0f */,
+    MRB_TT_MAXDEFINE /* 0x10 */,
+    MRB_TT_INTEGER /* 0x11 */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x12 */,
+#else
+    MRB_TT_FLOAT  /* 0x12 */,
+#endif
+    MRB_TT_INTEGER /* 0x13 */,
+    MRB_TT_UNDEF /* 0x14 */,
+    MRB_TT_INTEGER /* 0x15 */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x16 */,
+#else
+    MRB_TT_FLOAT  /* 0x16 */,
+#endif
+    MRB_TT_INTEGER /* 0x17 */,
+    MRB_TT_MAXDEFINE /* 0x18 */,
+    MRB_TT_INTEGER /* 0x19 */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x1a */,
+#else
+    MRB_TT_FLOAT  /* 0x1a */,
+#endif
+    MRB_TT_INTEGER /* 0x1b */,
+    MRB_TT_SYMBOL /* 0x1c */,
+    MRB_TT_INTEGER /* 0x1d */,
+#ifdef MRB_WORDBOX_NO_FLOAT_TRUNCATE
+    MRB_TT_SYMBOL /* 0x1e */,
+#else
+    MRB_TT_FLOAT  /* 0x1e */,
+#endif
+    MRB_TT_INTEGER /* 0x1f */
+  };
+
+  enum mrb_vtype tt = (enum mrb_vtype)lut[o.w & 0x1f];
+  if (tt == MRB_TT_MAXDEFINE) {
+    if (o.w) {  tt = mrb_val_union(o).bp->tt; }
+    else { tt = MRB_TT_FALSE; }
   }
+  return tt;
 }
 
 MRB_INLINE enum mrb_vtype
