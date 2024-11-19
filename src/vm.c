@@ -16,6 +16,7 @@
 #include <mruby/variable.h>
 #include <mruby/error.h>
 #include <mruby/opcode.h>
+#include "mruby/boxing_word.h"
 #include "value_array.h"
 #include <mruby/throw.h>
 #include <mruby/dump.h>
@@ -2398,6 +2399,19 @@ RETRY_TRY_BLOCK:
       regs[a] = stack[offset];
       NEXT;
     }
+
+    CASE(OP_OPT_SUCC, B) {
+      mrb_value val = regs[a];
+      if (mrb_integer_p(val)) {
+        regs[a] = mrb_int_value(mrb, mrb_integer(val) + 1);
+        NEXT;
+      } else {
+        mid = MRB_SYM(succ);
+        c = 0;
+        goto L_SEND_SYM;
+      }
+    }
+
 
 #if !defined(MRB_USE_BIGINT) || defined(MRB_INT32)
   L_INT_OVERFLOW:

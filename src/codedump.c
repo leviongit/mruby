@@ -6,6 +6,7 @@
 #include <mruby/proc.h>
 #include <mruby/dump.h>
 #include <mruby/internal.h>
+#include <stdio.h>
 
 #ifndef MRB_NO_STDIO
 static void
@@ -420,6 +421,9 @@ codedump(mrb_state *mrb, const mrb_irep *irep, FILE *out)
       break;
     CASE(OP_ALIAS, BB):
       fprintf(out, "ALIAS\t\t:%s\t%s\n", mrb_sym_dump(mrb, irep->syms[a]), mrb_sym_dump(mrb, irep->syms[b]));
+      break;
+    CASE(OP_OPT_SUCC, B):
+      fprintf(out, "OPT_SUCC\tR%d\n", a);
       break;
     CASE(OP_ADD, B):
       fprintf(out, "ADD\t\tR%d\tR%d\n", a, a+1);
