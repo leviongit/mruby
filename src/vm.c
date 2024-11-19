@@ -2403,7 +2403,11 @@ RETRY_TRY_BLOCK:
     CASE(OP_OPT_SUCC, B) {
       mrb_value val = regs[a];
       if (mrb_integer_p(val)) {
+#ifdef MRB_WORD_BOXING
+        regs[a] = (mrb_value){val.w + 2};
+#elif
         regs[a] = mrb_int_value(mrb, mrb_integer(val) + 1);
+#endif
         NEXT;
       } else {
         mid = MRB_SYM(succ);
