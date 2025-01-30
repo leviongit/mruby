@@ -2430,11 +2430,11 @@ RETRY_TRY_BLOCK:
       mrb_value blk = stack[mbidx];
       const struct RProc *p = mrb_proc_ptr(blk);
 
-      mrb_int bidx = a + c + 1;
+      mrb_int bidx = a + b + 1;
 
-      if (c >= CALL_MAXARGS) {
+      if (b >= CALL_MAXARGS) {
         int n = c&0xf;
-        int nk = (c>>4)&0xf;
+        int nk = (b>>4)&0xf;
         bidx = a + mrb_bidx(n, nk);
         if (nk == CALL_MAXARGS) {
           mrb_ensure_hash_type(mrb, regs[a+(n==CALL_MAXARGS?1:n)+1]);
@@ -2445,7 +2445,7 @@ RETRY_TRY_BLOCK:
           ci = mrb->c->ci;
           regs[kidx] = kdict;
           nk = CALL_MAXARGS;
-          c = n | (nk<<4);
+          b = n | (nk<<4);
           bidx = a + mrb_bidx(n, nk);
         }
       }
