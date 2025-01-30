@@ -2424,7 +2424,8 @@ RETRY_TRY_BLOCK:
 
       mrb_int mbidx = ci_bidx(env ? env->cxt->ci : ci);
       if (!mrb_proc_p(stack[mbidx])) {
-        RAISE_LIT(mrb, E_LOCALJUMP_ERROR, "unexpected yield");
+        mrb_p(mrb, stack[mbidx]);
+        RAISE_LIT(mrb, E_LOCALJUMP_ERROR, "unexpected yield 2");
       }
 
       mrb_value blk = stack[mbidx];
@@ -2433,7 +2434,7 @@ RETRY_TRY_BLOCK:
       mrb_int bidx = a + b + 1;
 
       if (b >= CALL_MAXARGS) {
-        int n = c&0xf;
+        int n = b&0xf;
         int nk = (b>>4)&0xf;
         bidx = a + mrb_bidx(n, nk);
         if (nk == CALL_MAXARGS) {
