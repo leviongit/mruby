@@ -388,13 +388,8 @@ codedump(mrb_state *mrb, const mrb_irep *irep, FILE *out)
       fprintf(out, "BREAK\t\tR%d\t\t", a);
       print_lv_a(mrb, irep, a, out);
       break;
-    CASE(OP_BLKPUSH, BS):
-      fprintf(out, "BLKPUSH\tR%d\t%d:%d:%d:%d (%d)\t", a,
-             (b>>11)&0x3f,
-             (b>>10)&0x1,
-             (b>>5)&0x1f,
-             (b>>4)&0x1,
-             (b>>0)&0xf);
+    CASE(OP_BLKCALL, BB):
+      fprintf(out, "BLKCALL\tR%d\tn=%d|nk=%d\t", a, b & 0xf, b >> 4);
       print_lv_a(mrb, irep, a, out);
       break;
     CASE(OP_LAMBDA, BB):

@@ -232,6 +232,19 @@ uvenv(mrb_state *mrb, mrb_int up)
   return NULL;
 }
 
+static inline struct REnv*
+methenv(mrb_state *mrb)
+{
+  const struct RProc *proc = mrb->c->ci->proc;
+
+  while (proc->upper && !MRB_PROC_SCOPE_P(proc->upper)) {
+    proc = proc->upper;
+    if (!proc) return NULL;
+  }
+
+  return MRB_PROC_ENV(proc);
+}
+
 static inline const struct RProc*
 top_proc(mrb_state *mrb, const struct RProc *proc, const struct REnv **envp)
 {
@@ -2400,29 +2413,87 @@ RETRY_TRY_BLOCK:
       JUMP;
     }
 
-    CASE(OP_BLKPUSH, BS) {
-      int m1 = (b>>11)&0x3f;
-      int r  = (b>>10)&0x1;
-      int m2 = (b>>5)&0x1f;
-      int kd = (b>>4)&0x1;
-      int lv = (b>>0)&0xf;
-      int offset = m1+r+m2+kd;
-      mrb_value *stack;
+    CASE(OP_BLKCALL, BB) {
+      const struct REnv *env = methenv(mrb);
+      mrb_value *stack = env ? env->stack : regs;
 
-      if (lv == 0) stack = regs + 1;
-      else {
-        struct REnv *e = uvenv(mrb, lv-1);
-        if (!e || (!MRB_ENV_ONSTACK_P(e) && e->mid == 0) ||
-            MRB_ENV_LEN(e) <= offset+1) {
-          RAISE_LIT(mrb, E_LOCALJUMP_ERROR, "unexpected yield");
-        }
-        stack = e->stack + 1;
-      }
-      if (mrb_nil_p(stack[offset])) {
+      if (!stack || 
+          (ci->mid == 0 && env && !MRB_ENV_ONSTACK_P(env))) {
         RAISE_LIT(mrb, E_LOCALJUMP_ERROR, "unexpected yield");
       }
-      regs[a] = stack[offset];
-      NEXT;
+
+      mrb_int mbidx = ci_bidx(env ? env->cxt->ci : ci);
+      if (!mrb_proc_p(stack[mbidx])) {
+        RAISE_LIT(mrb, E_LOCALJUMP_ERROR, "unexpected yield");
+      }
+
+      mrb_value blk = stack[mbidx];
+      const struct RProc *p = mrb_proc_ptr(blk);
+
+      mrb_int bidx = a + c + 1;
+
+      if (c >= CALL_MAXARGS) {
+        int n = c&0xf;
+        int nk = (c>>4)&0xf;
+        bidx = a + mrb_bidx(n, nk);
+        if (nk == CALL_MAXARGS) {
+          mrb_ensure_hash_type(mrb, regs[a+(n==CALL_MAXARGS?1:n)+1]);
+        }
+        else if (nk > 0) {  /* pack keyword arguments */
+          mrb_int kidx = a+(n==CALL_MAXARGS?1:n)+1;
+          mrb_value kdict = hash_new_from_regs(mrb, nk, kidx);
+          ci = mrb->c->ci;
+          regs[kidx] = kdict;
+          nk = CALL_MAXARGS;
+          c = n | (nk<<4);
+          bidx = a + mrb_bidx(n, nk);
+        }
+      }
+
+      SET_NIL_VALUE(regs[bidx]);
+
+      mrb_sym mid = 0;
+      if (MRB_PROC_ALIAS_P(p)) {
+        mid = p->body.mid;
+        p = p->upper;
+      } else if (MRB_PROC_ENV_P(p)) {
+        mid = MRB_PROC_ENV(p)->mid;
+      }
+
+      //! todo : set target class + proc
+      ci = cipush(mrb, 
+                  a, 
+                  CINFO_NONE,
+                  MRB_PROC_TARGET_CLASS(p),
+                  p,
+                  NULL,
+                  mid,
+                  b);
+      
+      if (MRB_PROC_CFUNC_P(p)) {
+        blk = MRB_PROC_CFUNC(p)(mrb, blk);
+        mrb_gc_arena_shrink(mrb, ai);
+        if (mrb->exc) goto L_RAISE;
+        ci = cipop(mrb);
+        ci->stack[a] = blk;
+        irep = ci->proc->body.irep;
+      } else {
+        irep = p->body.irep;
+        if (!irep) {
+          SET_NIL_VALUE(ci->stack[0]);
+          a = 0;
+          cipop(mrb);
+          NEXT;
+        }
+
+        if (MRB_PROC_ENV_P(p)) {
+          regs[0] = MRB_PROC_ENV(p)->stack[0];
+        }
+
+        ci->pc = irep->iseq;
+      }
+
+      JUMP;
     }
 
 #if !defined(MRB_USE_BIGINT) || defined(MRB_INT32)

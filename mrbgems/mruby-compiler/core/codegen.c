@@ -627,7 +627,7 @@ gen_move(codegen_scope *s, uint16_t dst, uint16_t src, int nopeep)
     case OP_LOADL: case OP_LOADSYM:
     case OP_GETGV: case OP_GETSV: case OP_GETIV: case OP_GETCV:
     case OP_GETCONST: case OP_STRING:
-    case OP_LAMBDA: case OP_BLOCK: case OP_METHOD: case OP_BLKPUSH:
+    case OP_LAMBDA: case OP_BLOCK: case OP_METHOD:
       if (data.a != src || data.a < s->nlocals) goto normal;
       rewind_pc(s);
       genop_2(s, data.insn, dst, data.b);
@@ -3285,9 +3285,7 @@ codegen(codegen_scope *s, node *tree, int val)
       }
       push();pop(); /* space for a block */
       pop_n(n + (nk == 15 ? 1 : nk * 2) + 1);
-      genop_2S(s, OP_BLKPUSH, cursp(), (ainfo<<4)|(lv & 0xf));
-      if (sendv) n = CALL_MAXARGS;
-      genop_3(s, OP_SEND, cursp(), new_sym(s, MRB_SYM_2(s->mrb, call)), n|(nk<<4));
+      genop_2(s, OP_BLKCALL, cursp(), (sendv?15:n)|(nk<<4));
       if (val) push();
     }
     break;
