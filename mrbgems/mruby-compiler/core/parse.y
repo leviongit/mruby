@@ -1931,6 +1931,7 @@ prohibit_literals(parser_state *p, node *n)
         keyword__LINE__ "'__LINE__'"
         keyword__FILE__ "'__FILE__'"
         keyword__ENCODING__     "'__ENCODING__'"
+        keyword_defined "'defined?'"
 
 %token <id>  tIDENTIFIER "local variable or method"
 %token <id>  tFID "method"
@@ -2310,8 +2311,17 @@ expr            : command_call
                     {
                       $$ = call_uni_op(p, cond($2), "!");
                     }
+                | defined_expression
                 | arg
                 ;
+
+defined_with_parens : keyword_defined '(' primary ')';
+
+defined_without_parens : keyword_defined expr;
+
+defined_expression : defined_with_parens 
+                   | defined_without_parens
+                   ;
 
 defn_head       : keyword_def fname
                     {
@@ -2675,7 +2685,7 @@ op              : '|'           { $$ = intern_op(or);     }
 reswords        : keyword__LINE__ | keyword__FILE__ | keyword__ENCODING__
                 | keyword_BEGIN | keyword_END
                 | keyword_alias | keyword_and | keyword_begin
-                | keyword_break | keyword_case | keyword_class | keyword_def
+                | keyword_break | keyword_case | keyword_class | keyword_def | keyword_defined
                 | keyword_do | keyword_else | keyword_elsif
                 | keyword_end | keyword_ensure | keyword_false
                 | keyword_for | keyword_in | keyword_module | keyword_next

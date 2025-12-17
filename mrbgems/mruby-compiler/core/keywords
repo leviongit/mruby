@@ -49,4 +49,5 @@ until,        {keyword_until,       modifier_until},      EXPR_VALUE
 when,         {keyword_when,        keyword_when},        EXPR_VALUE
 while,        {keyword_while,       modifier_while},      EXPR_VALUE
 yield,        {keyword_yield,       keyword_yield},       EXPR_ARG
+defined?,     {keyword_defined,     keyword_defined},     EXPR_ARG
 %%
