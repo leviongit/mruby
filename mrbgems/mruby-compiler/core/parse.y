@@ -1950,7 +1950,7 @@ prohibit_literals(parser_state *p, node *n)
 %token <num> tNUMPARAM "numbered parameter"
 
 %type <nd> singleton string string_fragment string_rep string_interp xstring regexp
-%type <nd> literal numeric cpath symbol defn_head defs_head
+%type <nd> literal numeric cpath symbol defn_head defs_head defined_with_parens defined_without_parens
 %type <nd> top_compstmt top_stmts top_stmt
 %type <nd> bodystmt compstmt stmts stmt expr arg primary command command_call method_call
 %type <nd> expr_value arg_rhs primary_value
@@ -2315,9 +2315,15 @@ expr            : command_call
                 | arg
                 ;
 
-defined_with_parens : keyword_defined '(' primary ')';
+defined_with_parens : keyword_defined '(' primary ')'
+                      {
+                        $$ = new_defined(p, $3);
+                      };
 
-defined_without_parens : keyword_defined expr;
+defined_without_parens : keyword_defined expr
+                         {
+                          $$ = new_defined(p, $2);
+                         };
 
 defined_expression : defined_with_parens 
                    | defined_without_parens
